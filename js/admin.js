@@ -264,12 +264,8 @@ function renderBookForm(book = null) {
         </div>
       </div>
       <div>
-        <label>Spoiler-Free Review</label>
-        <textarea id="bf-review-free">${isEdit ? (book.reviewSpoilerFree || '') : ''}</textarea>
-      </div>
-      <div>
-        <label>Spoiler Review</label>
-        <textarea id="bf-review-spoiler">${isEdit ? (book.reviewSpoiler || '') : ''}</textarea>
+        <label>Review</label>
+        <textarea id="bf-review">${isEdit ? (book.review || book.reviewSpoilerFree || '') : ''}</textarea>
       </div>
       <input type="hidden" id="bf-id" value="${isEdit ? book.id : ''}">
       <div class="form-actions">
@@ -419,8 +415,7 @@ function handleBookSubmit(e) {
     rating: parseInt(document.getElementById('bf-rating').value),
     tags: selectedTags,
     dateAdded: id ? (data.books.find(b => b.id === parseInt(id))?.dateAdded || new Date().toISOString().split('T')[0]) : new Date().toISOString().split('T')[0],
-    reviewSpoilerFree: document.getElementById('bf-review-free').value.trim(),
-    reviewSpoiler: document.getElementById('bf-review-spoiler').value.trim()
+    review: document.getElementById('bf-review').value.trim()
   };
 
   if (id) {

@@ -38,6 +38,8 @@ async function loadBook() {
 
   document.title = `${book.title} — Bookshelf`;
 
+  const review = book.review || book.reviewSpoilerFree || '';
+
   const container = document.getElementById('book-detail');
   container.innerHTML = `
     <a href="index.html" class="back-link">&larr; Back to Bookshelf</a>
@@ -45,7 +47,7 @@ async function loadBook() {
       <div class="detail-cover">
         ${book.cover
           ? `<img src="${book.cover}" alt="${book.title}" onerror="this.src=''; this.alt='No cover available'">`
-          : '<div style="width:200px;height:300px;background:#e8e0d8;display:flex;align-items:center;justify-content:center;color:#999">No Cover</div>'}
+          : '<div style="width:200px;height:300px;background:#f7f8fa;display:flex;align-items:center;justify-content:center;color:#97a3b6">No Cover</div>'}
       </div>
       <div class="detail-info">
         <h2>${book.title}</h2>
@@ -59,27 +61,13 @@ async function loadBook() {
       </div>
     </div>
 
-    ${book.reviewSpoilerFree ? `
+    ${review ? `
       <div class="review-section">
         <div class="review-header" onclick="toggleReview(this)">
-          Spoiler-Free Review
+          Review
           <span class="toggle">&#9660;</span>
         </div>
-        <div class="review-body">${book.reviewSpoilerFree}</div>
-      </div>
-    ` : ''}
-
-    ${book.reviewSpoiler ? `
-      <div class="spoiler-warning" id="spoiler-warning">
-        This section contains spoilers!
-        <button onclick="showSpoilerReview()">Show Spoilers</button>
-      </div>
-      <div class="review-section" id="spoiler-section" style="display:none">
-        <div class="review-header" onclick="toggleReview(this)">
-          Spoiler Review
-          <span class="toggle">&#9660;</span>
-        </div>
-        <div class="review-body">${book.reviewSpoiler}</div>
+        <div class="review-body">${review}</div>
       </div>
     ` : ''}
   `;
@@ -95,11 +83,6 @@ function toggleReview(header) {
     body.classList.add('hidden');
     toggle.innerHTML = '&#9654;';
   }
-}
-
-function showSpoilerReview() {
-  document.getElementById('spoiler-warning').style.display = 'none';
-  document.getElementById('spoiler-section').style.display = 'block';
 }
 
 document.addEventListener('DOMContentLoaded', loadBook);
