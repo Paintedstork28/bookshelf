@@ -8,6 +8,20 @@ async function loadData() {
   const stored = localStorage.getItem('bookshelf_data');
   if (stored) {
     const data = JSON.parse(stored);
+    // Migrate old spoiler/non-spoiler fields to single review
+    let changed = false;
+    (data.books || []).forEach(book => {
+      if (book.reviewSpoilerFree || book.reviewSpoiler) {
+        if (!book.review) {
+          const parts = [book.reviewSpoilerFree, book.reviewSpoiler].filter(Boolean);
+          book.review = parts.join('\n\n');
+        }
+        delete book.reviewSpoilerFree;
+        delete book.reviewSpoiler;
+        changed = true;
+      }
+    });
+    if (changed) localStorage.setItem('bookshelf_data', JSON.stringify(data));
     allBooks = data.books || [];
     allCategories = data.categories || [];
     allTags = data.tags || [];

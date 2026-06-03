@@ -121,9 +121,26 @@ function loadData() {
   const stored = localStorage.getItem('bookshelf_data');
   if (stored) {
     data = JSON.parse(stored);
+    migrateReviews();
   } else {
     // Load will be async, trigger from init
   }
+}
+
+function migrateReviews() {
+  let changed = false;
+  data.books.forEach(book => {
+    if (book.reviewSpoilerFree || book.reviewSpoiler) {
+      if (!book.review) {
+        const parts = [book.reviewSpoilerFree, book.reviewSpoiler].filter(Boolean);
+        book.review = parts.join('\n\n');
+      }
+      delete book.reviewSpoilerFree;
+      delete book.reviewSpoiler;
+      changed = true;
+    }
+  });
+  if (changed) saveData();
 }
 
 async function loadDataFromFile() {
