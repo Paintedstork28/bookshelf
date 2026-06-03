@@ -492,9 +492,10 @@ function renderBookForm(book = null) {
       <div class="form-row">
         <div>
           <label>Rating *</label>
-          <select id="bf-rating" required>
-            ${[1,2,3,4,5].map(r => `<option value="${r}" ${isEdit && book.rating === r ? 'selected' : ''}>${r} Star${r > 1 ? 's' : ''}</option>`).join('')}
-          </select>
+          <div class="star-rating-input" id="star-rating-input">
+            ${[1,2,3,4,5].map(r => `<button type="button" class="star-btn ${isEdit && book.rating >= r ? 'active' : ''}" data-value="${r}">&#9733;</button>`).join('')}
+          </div>
+          <input type="hidden" id="bf-rating" value="${isEdit ? book.rating : ''}" required>
         </div>
         <div>
           <label>Tags</label>
@@ -522,6 +523,18 @@ function renderBookForm(book = null) {
 
   document.getElementById('book-form').addEventListener('submit', handleBookSubmit);
   document.getElementById('fetch-cover-btn').addEventListener('click', fetchCover);
+
+  // Interactive star rating
+  document.querySelectorAll('#star-rating-input .star-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = parseInt(btn.dataset.value);
+      document.getElementById('bf-rating').value = val;
+      document.querySelectorAll('#star-rating-input .star-btn').forEach(b => {
+        b.classList.toggle('active', parseInt(b.dataset.value) <= val);
+      });
+    });
+  });
+
   document.getElementById('bf-author').addEventListener('blur', () => {
     const title = document.getElementById('bf-title').value.trim();
     const author = document.getElementById('bf-author').value.trim();
@@ -668,6 +681,11 @@ function cancelForm() {
 function handleBookSubmit(e) {
   e.preventDefault();
   const id = document.getElementById('bf-id').value;
+  const ratingVal = parseInt(document.getElementById('bf-rating').value);
+  if (!ratingVal || ratingVal < 1 || ratingVal > 5) {
+    showToast('Please select a rating.');
+    return;
+  }
   const selectedTags = Array.from(document.querySelectorAll('.tag-checkboxes input:checked')).map(cb => cb.value);
 
   const bookData = {
