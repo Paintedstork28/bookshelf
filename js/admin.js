@@ -115,12 +115,50 @@ function showAuthForm() {
 function showAdmin() {
   document.getElementById('auth-container').innerHTML = '';
   document.getElementById('admin-content').style.display = 'block';
-  document.getElementById('logout-btn').style.display = 'inline';
   loadData();
   renderAll();
 
+  // Sidebar navigation
+  document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.preventDefault();
+      switchPanel(item.dataset.section);
+    });
+  });
+
+  // Action buttons
+  document.getElementById('btn-add-book').addEventListener('click', showAddBookForm);
+  document.getElementById('btn-add-category').addEventListener('click', addCategory);
+  document.getElementById('btn-add-tag').addEventListener('click', addTag);
+  document.getElementById('btn-clear-backups').addEventListener('click', clearAllBackups);
+  document.getElementById('nav-export').addEventListener('click', (e) => { e.preventDefault(); exportData(); });
+  document.getElementById('nav-import').addEventListener('click', (e) => { e.preventDefault(); importData(); });
+  document.getElementById('logout-btn').addEventListener('click', (e) => { e.preventDefault(); logout(); });
+
+  // Search and sort
   document.getElementById('admin-search').addEventListener('input', renderBookList);
   document.getElementById('admin-sort').addEventListener('change', renderBookList);
+
+  // Mobile sidebar toggle
+  const menuBtn = document.getElementById('mobile-menu-btn');
+  if (menuBtn) {
+    menuBtn.addEventListener('click', () => {
+      document.querySelector('.admin-sidebar').classList.toggle('open');
+    });
+  }
+}
+
+function switchPanel(section) {
+  document.querySelectorAll('.admin-panel').forEach(p => p.style.display = 'none');
+  const panel = document.getElementById('panel-' + section);
+  if (panel) panel.style.display = 'block';
+
+  document.querySelectorAll('.nav-item[data-section]').forEach(item => {
+    item.classList.toggle('active', item.dataset.section === section);
+  });
+
+  // Close mobile sidebar
+  document.querySelector('.admin-sidebar').classList.remove('open');
 }
 
 // --- Data ---
@@ -229,11 +267,11 @@ function renderBackups() {
   const backups = getBackups();
 
   if (backups.length === 0) {
-    container.innerHTML = '<p style="color:#97a3b6;font-size:13px;">No backups yet. Backups are created automatically before destructive actions.</p>';
+    container.innerHTML = '<p style="color:#999;font-size:13px;">No backups yet. Backups are created automatically before destructive actions.</p>';
     return;
   }
 
-  container.innerHTML = backups.map(b => {
+  container.innerHTML = '<div class="backup-list">' + backups.map(b => {
     const date = new Date(b.timestamp);
     const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -244,13 +282,14 @@ function renderBackups() {
           <div class="backup-meta">${b.bookCount} book${b.bookCount !== 1 ? 's' : ''}</div>
         </div>
         <div class="backup-actions">
-          <button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;" data-action="restore" data-key="${escapeHtml(b.key)}">Restore</button>
-          <button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;" data-action="download" data-key="${escapeHtml(b.key)}">Download</button>
-          <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" data-action="delete-backup" data-key="${escapeHtml(b.key)}">Delete</button>
+          <button class="btn btn-ghost btn-sm" data-action="restore" data-key="${escapeHtml(b.key)}">Restore</button>
+          <button class="btn btn-ghost btn-sm" data-action="download" data-key="${escapeHtml(b.key)}">Download</button>
+          <button class="btn btn-danger btn-sm" data-action="delete-backup" data-key="${escapeHtml(b.key)}">Delete</button>
         </div>
       </div>
     `;
-  }).join('');
+  }).join('') + '</div>';
+
   container.querySelectorAll('[data-action="restore"]').forEach(btn => {
     btn.addEventListener('click', () => restoreBackup(btn.dataset.key));
   });
@@ -283,7 +322,6 @@ function showToast(msg, undoCallback) {
     });
     _undoTimer = setTimeout(() => {
       toast.classList.remove('show');
-      // Finalize the delete — already removed from data, just clear undo state
       _lastDeleted = null;
       _lastDeletedIndex = -1;
     }, 8000);
@@ -296,14 +334,58 @@ function showToast(msg, undoCallback) {
 
 // --- Render ---
 function renderAll() {
+  renderStats();
+  renderNavBadges();
   renderCategories();
   renderTags();
   renderBookList();
   renderBackups();
 }
 
+function renderStats() {
+  const bar = document.getElementById('stats-bar');
+  const avgRating = data.books.length > 0
+    ? (data.books.reduce((sum, b) => sum + b.rating, 0) / data.books.length).toFixed(1)
+    : '—';
+
+  let lastAdded = '—';
+  if (data.books.length > 0) {
+    const sorted = data.books.slice().sort((a, b) => new Date(b.dateAdded) - new Date(a.dateAdded));
+    lastAdded = new Date(sorted[0].dateAdded).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  bar.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">Total Books</div>
+      <div class="stat-value">${data.books.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Categories</div>
+      <div class="stat-value">${data.categories.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Avg Rating</div>
+      <div class="stat-value">${avgRating}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Last Added</div>
+      <div class="stat-value stat-sm">${lastAdded}</div>
+    </div>
+  `;
+}
+
+function renderNavBadges() {
+  document.getElementById('nav-book-count').textContent = data.books.length;
+  document.getElementById('nav-cat-count').textContent = data.categories.length;
+  document.getElementById('nav-tag-count').textContent = data.tags.length;
+}
+
 function renderCategories() {
   const list = document.getElementById('category-list');
+  if (data.categories.length === 0) {
+    list.innerHTML = '<span style="color:#999;font-size:13px;">No categories yet.</span>';
+    return;
+  }
   list.innerHTML = data.categories.map((cat, i) => `
     <span class="item-chip">
       ${escapeHtml(cat)}
@@ -317,6 +399,10 @@ function renderCategories() {
 
 function renderTags() {
   const list = document.getElementById('tag-list');
+  if (data.tags.length === 0) {
+    list.innerHTML = '<span style="color:#999;font-size:13px;">No tags yet. Add your first tag below.</span>';
+    return;
+  }
   list.innerHTML = data.tags.map((tag, i) => `
     <span class="item-chip">
       ${escapeHtml(tag)}
@@ -370,21 +456,23 @@ function renderBookList() {
   const isSearching = searchEl && searchEl.value.trim() !== '';
 
   if (data.books.length === 0) {
-    list.innerHTML = '<p style="color:#97a3b6;font-size:13px">No books yet. Add one below.</p>';
+    list.innerHTML = '<div class="list-empty">No books yet. Click "+ Add Book" to get started.</div>';
     return;
   }
 
   if (books.length === 0) {
-    list.innerHTML = '<p style="color:#97a3b6;font-size:13px">No books match your search.</p>';
+    list.innerHTML = '<div class="list-empty">No books match your search.</div>';
     return;
   }
 
   const canDrag = isCustomOrder && !isSearching;
 
-  list.innerHTML = books.map(book => `
+  list.innerHTML = books.map(book => {
+    const dateStr = new Date(book.dateAdded).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `
     <div class="admin-book-item" data-book-id="${book.id}" ${canDrag ? 'draggable="true"' : ''}>
       <div class="book-info">
-        ${canDrag ? '<span class="drag-handle" title="Drag to reorder">&#9776;</span>' : ''}
+        ${canDrag ? '<span class="drag-handle" title="Drag to reorder">&#8942;&#8942;</span>' : ''}
         ${book.cover ? `<img src="${escapeHtml(book.cover)}" alt="" onerror="this.style.display='none'">` : ''}
         <div>
           <div class="book-title">${escapeHtml(book.title)}</div>
@@ -392,11 +480,11 @@ function renderBookList() {
         </div>
       </div>
       <div class="book-actions">
-        <button class="btn btn-secondary" data-action="edit" data-id="${book.id}">Edit</button>
-        <button class="btn btn-danger" data-action="delete" data-id="${book.id}">Delete</button>
+        <button class="btn btn-ghost btn-sm" data-action="edit" data-id="${book.id}">Edit</button>
+        <button class="btn btn-danger btn-sm" data-action="delete" data-id="${book.id}">Delete</button>
       </div>
     </div>
-  `).join('');
+  `}).join('');
 
   list.querySelectorAll('[data-action="edit"]').forEach(btn => {
     btn.addEventListener('click', () => editBook(parseInt(btn.dataset.id)));
@@ -460,69 +548,72 @@ function renderBookForm(book = null) {
   const isEdit = book !== null;
 
   container.innerHTML = `
-    <h3>${isEdit ? 'Edit Book' : 'Add New Book'}</h3>
-    <form class="book-form" id="book-form">
-      <div class="form-row">
-        <div>
-          <label>Title *</label>
-          <input type="text" id="bf-title" value="${isEdit ? escapeHtml(book.title) : ''}" required>
-        </div>
-        <div>
-          <label>Author *</label>
-          <input type="text" id="bf-author" value="${isEdit ? escapeHtml(book.author) : ''}" required>
-        </div>
-      </div>
-      <div class="form-row">
-        <div>
-          <label>Cover Image URL</label>
-          <div style="display:flex;gap:0.5rem;align-items:center">
-            <input type="url" id="bf-cover" value="${isEdit ? escapeHtml(book.cover || '') : ''}" placeholder="Auto-fetched from Open Library..." style="flex:1">
-            <button type="button" class="btn btn-secondary" id="fetch-cover-btn">Fetch Cover</button>
+    <div class="section-card" style="margin-top:16px;">
+      <h3 style="font-size:14px;font-weight:700;margin-bottom:14px;">${isEdit ? 'Edit Book' : 'Add New Book'}</h3>
+      <form class="book-form" id="book-form">
+        <div class="form-row">
+          <div>
+            <label>Title *</label>
+            <input type="text" id="bf-title" value="${isEdit ? escapeHtml(book.title) : ''}" required>
           </div>
-          <small id="cover-status" style="color:#97a3b6;font-size:0.75rem">Fill in title & author, then click Fetch Cover — or it auto-fetches when you tab out of Author.</small>
-        </div>
-        <div>
-          <label>Category *</label>
-          <select id="bf-category" required>
-            <option value="">Select...</option>
-            ${data.categories.map(c => `<option value="${escapeHtml(c)}" ${isEdit && book.category === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-      <div class="form-row">
-        <div>
-          <label>Rating *</label>
-          <div class="star-rating-input" id="star-rating-input">
-            ${[1,2,3,4,5].map(r => `<button type="button" class="star-btn ${isEdit && book.rating >= r ? 'active' : ''}" data-value="${r}">&#9733;</button>`).join('')}
-          </div>
-          <input type="hidden" id="bf-rating" value="${isEdit ? book.rating : ''}" required>
-        </div>
-        <div>
-          <label>Tags</label>
-          <div class="tag-checkboxes">
-            ${data.tags.map(t => `
-              <label>
-                <input type="checkbox" value="${escapeHtml(t)}" ${isEdit && (book.tags || []).includes(t) ? 'checked' : ''}>
-                ${escapeHtml(t)}
-              </label>
-            `).join('')}
+          <div>
+            <label>Author *</label>
+            <input type="text" id="bf-author" value="${isEdit ? escapeHtml(book.author) : ''}" required>
           </div>
         </div>
-      </div>
-      <div>
-        <label>Review</label>
-        <textarea id="bf-review">${isEdit ? escapeHtml(book.review || '') : ''}</textarea>
-      </div>
-      <input type="hidden" id="bf-id" value="${isEdit ? book.id : ''}">
-      <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="cancelForm()">Cancel</button>
-        <button type="submit" class="btn btn-primary">${isEdit ? 'Update Book' : 'Add Book'}</button>
-      </div>
-    </form>
+        <div class="form-row">
+          <div>
+            <label>Cover Image URL</label>
+            <div style="display:flex;gap:0.5rem;align-items:center">
+              <input type="url" id="bf-cover" value="${isEdit ? escapeHtml(book.cover || '') : ''}" placeholder="Auto-fetched from Open Library..." style="flex:1">
+              <button type="button" class="btn btn-ghost btn-sm" id="fetch-cover-btn">Fetch Cover</button>
+            </div>
+            <small id="cover-status" style="color:#999;font-size:0.75rem">Fill in title & author, then click Fetch Cover — or it auto-fetches when you tab out of Author.</small>
+          </div>
+          <div>
+            <label>Category *</label>
+            <select id="bf-category" required>
+              <option value="">Select...</option>
+              ${data.categories.map(c => `<option value="${escapeHtml(c)}" ${isEdit && book.category === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div>
+            <label>Rating *</label>
+            <div class="star-rating-input" id="star-rating-input">
+              ${[1,2,3,4,5].map(r => `<button type="button" class="star-btn ${isEdit && book.rating >= r ? 'active' : ''}" data-value="${r}">&#9733;</button>`).join('')}
+            </div>
+            <input type="hidden" id="bf-rating" value="${isEdit ? book.rating : ''}" required>
+          </div>
+          <div>
+            <label>Tags</label>
+            <div class="tag-checkboxes">
+              ${data.tags.map(t => `
+                <label>
+                  <input type="checkbox" value="${escapeHtml(t)}" ${isEdit && (book.tags || []).includes(t) ? 'checked' : ''}>
+                  ${escapeHtml(t)}
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+        <div>
+          <label>Review</label>
+          <textarea id="bf-review">${isEdit ? escapeHtml(book.review || '') : ''}</textarea>
+        </div>
+        <input type="hidden" id="bf-id" value="${isEdit ? book.id : ''}">
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" id="btn-cancel-form">Cancel</button>
+          <button type="submit" class="btn btn-primary">${isEdit ? 'Update Book' : 'Add Book'}</button>
+        </div>
+      </form>
+    </div>
   `;
 
   document.getElementById('book-form').addEventListener('submit', handleBookSubmit);
   document.getElementById('fetch-cover-btn').addEventListener('click', fetchCover);
+  document.getElementById('btn-cancel-form').addEventListener('click', cancelForm);
 
   // Interactive star rating
   document.querySelectorAll('#star-rating-input .star-btn').forEach(btn => {
@@ -557,7 +648,7 @@ async function fetchCover() {
   btn.disabled = true;
   btn.textContent = 'Searching...';
   status.textContent = 'Searching Open Library...';
-  status.style.color = '#97a3b6';
+  status.style.color = '#999';
 
   try {
     const query = encodeURIComponent(`${title} ${author}`);
@@ -569,11 +660,11 @@ async function fetchCover() {
       if (doc.cover_i) {
         coverInput.value = `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`;
         status.textContent = 'Cover found!';
-        status.style.color = '#0fba68';
+        status.style.color = '#16a34a';
       } else if (doc.isbn && doc.isbn.length > 0) {
         coverInput.value = `https://covers.openlibrary.org/b/isbn/${doc.isbn[0]}-L.jpg`;
         status.textContent = 'Cover found via ISBN.';
-        status.style.color = '#0fba68';
+        status.style.color = '#16a34a';
       } else {
         status.textContent = 'No cover found. You can paste a URL manually.';
         status.style.color = '#e74c3c';
@@ -601,6 +692,8 @@ function addCategory() {
   data.categories.push(val);
   saveData();
   renderCategories();
+  renderNavBadges();
+  renderStats();
   input.value = '';
   showToast(`Category "${val}" added.`);
 }
@@ -610,6 +703,8 @@ function removeCategory(cat) {
   data.categories = data.categories.filter(c => c !== cat);
   saveData();
   renderCategories();
+  renderNavBadges();
+  renderStats();
   showToast(`Category "${cat}" removed.`);
 }
 
@@ -621,6 +716,7 @@ function addTag() {
   data.tags.push(val);
   saveData();
   renderTags();
+  renderNavBadges();
   input.value = '';
   showToast(`Tag "${val}" added.`);
 }
@@ -632,6 +728,7 @@ function removeTag(tag) {
   data.books.forEach(b => { b.tags = (b.tags || []).filter(t => t !== tag); });
   saveData();
   renderTags();
+  renderNavBadges();
   showToast(`Tag "${tag}" removed.`);
 }
 
@@ -649,24 +746,24 @@ function deleteBook(id) {
   const book = data.books.find(b => b.id === id);
   if (!book) return;
 
-  // Create backup before delete
   createBackup('Before deleting: ' + book.title);
 
-  // Soft-delete: remove from array but keep reference for undo
   const idx = data.books.findIndex(b => b.id === id);
   _lastDeleted = JSON.parse(JSON.stringify(book));
   _lastDeletedIndex = idx;
   data.books.splice(idx, 1);
   saveData();
   renderBookList();
+  renderStats();
+  renderNavBadges();
 
-  // Show toast with undo
   showToast(`"${book.title}" deleted.`, () => {
-    // Undo: re-insert at original position
     if (_lastDeleted) {
       data.books.splice(_lastDeletedIndex, 0, _lastDeleted);
       saveData();
       renderBookList();
+      renderStats();
+      renderNavBadges();
       _lastDeleted = null;
       _lastDeletedIndex = -1;
       showToast('Delete undone.');
@@ -694,7 +791,7 @@ function handleBookSubmit(e) {
     author: document.getElementById('bf-author').value.trim(),
     cover: document.getElementById('bf-cover').value.trim() || '',
     category: document.getElementById('bf-category').value,
-    rating: parseInt(document.getElementById('bf-rating').value),
+    rating: ratingVal,
     tags: selectedTags,
     dateAdded: id ? (data.books.find(b => b.id === parseInt(id))?.dateAdded || new Date().toISOString().split('T')[0]) : new Date().toISOString().split('T')[0],
     review: document.getElementById('bf-review').value.trim()
@@ -711,6 +808,8 @@ function handleBookSubmit(e) {
 
   saveData();
   renderBookList();
+  renderStats();
+  renderNavBadges();
   cancelForm();
 }
 
@@ -744,13 +843,11 @@ function importData() {
       const text = await file.text();
       const imported = JSON.parse(text);
 
-      // Validate structure
       if (!imported.books || !Array.isArray(imported.books) || !imported.categories || !Array.isArray(imported.categories)) {
         showToast('Invalid file: must have books and categories arrays.');
         return;
       }
 
-      // Validate each book has required fields
       const invalid = imported.books.filter(b => !b.title || !b.author || !b.id);
       if (invalid.length > 0) {
         showToast(`Invalid file: ${invalid.length} book(s) missing title, author, or id.`);
@@ -759,25 +856,21 @@ function importData() {
 
       if (!imported.tags) imported.tags = [];
 
-      // Auto-backup before import
       createBackup('Pre-import');
 
       if (mode === 'replace') {
         data = imported;
       } else {
-        // Merge: add books with new IDs, merge categories and tags
         const existingIds = new Set(data.books.map(b => b.id));
         let nextId = getNextId();
         imported.books.forEach(book => {
           if (!existingIds.has(book.id)) {
             data.books.push(book);
           } else {
-            // ID conflict — assign new ID
             book.id = nextId++;
             data.books.push(book);
           }
         });
-        // Merge categories and tags (no duplicates)
         imported.categories.forEach(c => {
           if (!data.categories.includes(c)) data.categories.push(c);
         });

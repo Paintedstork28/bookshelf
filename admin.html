@@ -7,80 +7,121 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <header class="site-header">
-    <div class="header-inner">
-      <h1><a href="index.html">Bookshelf</a></h1>
-      <nav>
-        <a href="index.html">My Books</a>
-        <a href="admin.html" class="active">Admin</a>
-        <a href="#" id="logout-btn" style="display:none" onclick="logout(); return false;">Logout</a>
-      </nav>
-    </div>
-  </header>
 
   <div id="auth-container"></div>
 
   <div id="admin-content" style="display:none">
-    <div class="admin-container">
-      <h2>Admin Panel</h2>
-
-      <div class="data-bar">
-        <button class="btn btn-secondary" onclick="exportData()">Export JSON</button>
-        <button class="btn btn-secondary" onclick="importData()">Import JSON</button>
-      </div>
-
-      <div class="admin-section">
-        <h3>Categories</h3>
-        <div class="item-list" id="category-list"></div>
-        <div class="add-row">
-          <input type="text" id="new-category" placeholder="New category name...">
-          <button class="btn btn-primary" onclick="addCategory()">Add</button>
+    <div class="admin-layout">
+      <!-- Sidebar -->
+      <aside class="admin-sidebar">
+        <div class="sidebar-logo">Bookshelf</div>
+        <div class="nav-section">
+          <div class="nav-label">Content</div>
+          <a class="nav-item active" data-section="books" href="#">
+            <span class="nav-icon">&#128218;</span> Books <span class="nav-badge" id="nav-book-count">0</span>
+          </a>
+          <a class="nav-item" data-section="categories" href="#">
+            <span class="nav-icon">&#128193;</span> Categories <span class="nav-badge" id="nav-cat-count">0</span>
+          </a>
+          <a class="nav-item" data-section="tags" href="#">
+            <span class="nav-icon">&#127991;</span> Tags <span class="nav-badge" id="nav-tag-count">0</span>
+          </a>
         </div>
-      </div>
-
-      <div class="admin-section">
-        <h3>Tags</h3>
-        <div class="item-list" id="tag-list"></div>
-        <div class="add-row">
-          <input type="text" id="new-tag" placeholder="New tag name...">
-          <button class="btn btn-primary" onclick="addTag()">Add</button>
+        <div class="nav-section">
+          <div class="nav-label">Data</div>
+          <a class="nav-item" data-section="backups" href="#">
+            <span class="nav-icon">&#128190;</span> Backups
+          </a>
+          <a class="nav-item" href="#" id="nav-export">
+            <span class="nav-icon">&#128229;</span> Export JSON
+          </a>
+          <a class="nav-item" href="#" id="nav-import">
+            <span class="nav-icon">&#128228;</span> Import JSON
+          </a>
         </div>
-      </div>
+        <div class="sidebar-bottom">
+          <a href="index.html">&larr; View Public Site</a>
+          <a href="#" id="logout-btn">Logout</a>
+        </div>
+      </aside>
 
-      <div class="admin-section">
-        <h3>Books</h3>
-        <div class="admin-books-toolbar">
-          <div class="admin-search">
-            <span class="search-icon">&#128269;</span>
-            <input type="text" id="admin-search" placeholder="Search books...">
+      <!-- Main content -->
+      <main class="admin-main">
+        <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle menu">&#9776;</button>
+        <!-- Books Section -->
+        <div class="admin-panel" id="panel-books">
+          <div class="page-header">
+            <h1>Books</h1>
+            <div class="page-actions">
+              <button class="btn btn-primary" id="btn-add-book">+ Add Book</button>
+            </div>
           </div>
-          <div class="admin-sort">
-            <label>Sort:</label>
-            <select id="admin-sort">
-              <option value="custom">Custom Order</option>
-              <option value="title">Title</option>
-              <option value="author">Author</option>
-              <option value="rating">Rating</option>
-              <option value="date">Date Added</option>
-            </select>
+
+          <div class="stats-bar" id="stats-bar"></div>
+
+          <div class="admin-books-toolbar">
+            <div class="admin-search">
+              <span class="search-icon">&#128269;</span>
+              <input type="text" id="admin-search" placeholder="Search books...">
+            </div>
+            <div class="admin-sort">
+              <label>Sort:</label>
+              <select id="admin-sort">
+                <option value="custom">Custom Order</option>
+                <option value="title">Title</option>
+                <option value="author">Author</option>
+                <option value="rating">Rating</option>
+                <option value="date">Date Added</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="admin-book-list" id="admin-book-list"></div>
+
+          <div id="book-form-container"></div>
+        </div>
+
+        <!-- Categories Section -->
+        <div class="admin-panel" id="panel-categories" style="display:none">
+          <div class="page-header">
+            <h1>Categories</h1>
+          </div>
+          <div class="section-card">
+            <div class="chip-list" id="category-list"></div>
+            <div class="add-inline">
+              <input type="text" id="new-category" placeholder="New category name...">
+              <button class="btn btn-primary btn-sm" id="btn-add-category">Add</button>
+            </div>
           </div>
         </div>
-        <div class="admin-book-list" id="admin-book-list"></div>
-        <div style="margin-top:14px">
-          <button class="btn btn-success" onclick="showAddBookForm()">+ Add New Book</button>
+
+        <!-- Tags Section -->
+        <div class="admin-panel" id="panel-tags" style="display:none">
+          <div class="page-header">
+            <h1>Tags</h1>
+          </div>
+          <div class="section-card">
+            <div class="chip-list" id="tag-list"></div>
+            <div class="add-inline">
+              <input type="text" id="new-tag" placeholder="New tag name...">
+              <button class="btn btn-primary btn-sm" id="btn-add-tag">Add</button>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div id="book-form-container"></div>
-
-      <!-- Backups Section -->
-      <div class="admin-section">
-        <h3 style="display:flex;justify-content:space-between;align-items:center;">
-          Backups
-          <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="clearAllBackups()">Clear All</button>
-        </h3>
-        <div id="backup-list"></div>
-      </div>
+        <!-- Backups Section -->
+        <div class="admin-panel" id="panel-backups" style="display:none">
+          <div class="page-header">
+            <h1>Backups</h1>
+            <div class="page-actions">
+              <button class="btn btn-danger btn-sm" id="btn-clear-backups">Clear All</button>
+            </div>
+          </div>
+          <div class="section-card">
+            <div id="backup-list"></div>
+          </div>
+        </div>
+      </main>
     </div>
   </div>
 
