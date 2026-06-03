@@ -116,8 +116,13 @@ function showAdmin() {
   document.getElementById('auth-container').innerHTML = '';
   document.getElementById('admin-content').style.display = 'block';
   loadData();
-  renderAll();
 
+  // Ensure data has all required arrays
+  if (!data.categories) data.categories = [];
+  if (!data.tags) data.tags = [];
+  if (!data.books) data.books = [];
+
+  // Attach event listeners FIRST (before renderAll which could error)
   // Sidebar navigation
   document.querySelectorAll('.nav-item[data-section]').forEach(item => {
     item.addEventListener('click', (e) => {
@@ -146,6 +151,9 @@ function showAdmin() {
       document.querySelector('.admin-sidebar').classList.toggle('open');
     });
   }
+
+  // Render content last
+  renderAll();
 }
 
 function switchPanel(section) {
@@ -166,6 +174,9 @@ function loadData() {
   const loaded = loadBookshelfData();
   if (loaded) {
     data = loaded;
+    if (!data.categories) data.categories = [];
+    if (!data.tags) data.tags = [];
+    if (!data.books) data.books = [];
   }
 }
 
