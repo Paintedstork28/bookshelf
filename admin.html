@@ -49,6 +49,22 @@
 
       <div class="admin-section">
         <h3>Books</h3>
+        <div class="admin-books-toolbar">
+          <div class="admin-search">
+            <span class="search-icon">&#128269;</span>
+            <input type="text" id="admin-search" placeholder="Search books...">
+          </div>
+          <div class="admin-sort">
+            <label>Sort:</label>
+            <select id="admin-sort">
+              <option value="custom">Custom Order</option>
+              <option value="title">Title</option>
+              <option value="author">Author</option>
+              <option value="rating">Rating</option>
+              <option value="date">Date Added</option>
+            </select>
+          </div>
+        </div>
         <div class="admin-book-list" id="admin-book-list"></div>
         <div style="margin-top:14px">
           <button class="btn btn-success" onclick="showAddBookForm()">+ Add New Book</button>

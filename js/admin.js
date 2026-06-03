@@ -118,6 +118,9 @@ function showAdmin() {
   document.getElementById('logout-btn').style.display = 'inline';
   loadData();
   renderAll();
+
+  document.getElementById('admin-search').addEventListener('input', renderBookList);
+  document.getElementById('admin-sort').addEventListener('change', renderBookList);
 }
 
 // --- Data ---
@@ -325,15 +328,63 @@ function renderTags() {
   });
 }
 
+function getAdminBooks() {
+  const searchEl = document.getElementById('admin-search');
+  const sortEl = document.getElementById('admin-sort');
+  const search = searchEl ? searchEl.value.toLowerCase() : '';
+  const sort = sortEl ? sortEl.value : 'custom';
+
+  let books = data.books.slice();
+
+  if (search) {
+    books = books.filter(b =>
+      b.title.toLowerCase().includes(search) ||
+      b.author.toLowerCase().includes(search) ||
+      (b.category || '').toLowerCase().includes(search)
+    );
+  }
+
+  if (sort !== 'custom') {
+    books.sort((a, b) => {
+      switch (sort) {
+        case 'title': return a.title.localeCompare(b.title);
+        case 'author': return a.author.localeCompare(b.author);
+        case 'rating': return b.rating - a.rating;
+        case 'date': return new Date(b.dateAdded) - new Date(a.dateAdded);
+        default: return 0;
+      }
+    });
+  }
+
+  return books;
+}
+
+let _dragBookId = null;
+
 function renderBookList() {
   const list = document.getElementById('admin-book-list');
+  const books = getAdminBooks();
+  const sortEl = document.getElementById('admin-sort');
+  const isCustomOrder = sortEl && sortEl.value === 'custom';
+  const searchEl = document.getElementById('admin-search');
+  const isSearching = searchEl && searchEl.value.trim() !== '';
+
   if (data.books.length === 0) {
     list.innerHTML = '<p style="color:#97a3b6;font-size:13px">No books yet. Add one below.</p>';
     return;
   }
-  list.innerHTML = data.books.map(book => `
-    <div class="admin-book-item">
+
+  if (books.length === 0) {
+    list.innerHTML = '<p style="color:#97a3b6;font-size:13px">No books match your search.</p>';
+    return;
+  }
+
+  const canDrag = isCustomOrder && !isSearching;
+
+  list.innerHTML = books.map(book => `
+    <div class="admin-book-item" data-book-id="${book.id}" ${canDrag ? 'draggable="true"' : ''}>
       <div class="book-info">
+        ${canDrag ? '<span class="drag-handle" title="Drag to reorder">&#9776;</span>' : ''}
         ${book.cover ? `<img src="${escapeHtml(book.cover)}" alt="" onerror="this.style.display='none'">` : ''}
         <div>
           <div class="book-title">${escapeHtml(book.title)}</div>
@@ -346,11 +397,61 @@ function renderBookList() {
       </div>
     </div>
   `).join('');
+
   list.querySelectorAll('[data-action="edit"]').forEach(btn => {
     btn.addEventListener('click', () => editBook(parseInt(btn.dataset.id)));
   });
   list.querySelectorAll('[data-action="delete"]').forEach(btn => {
     btn.addEventListener('click', () => deleteBook(parseInt(btn.dataset.id)));
+  });
+
+  if (canDrag) {
+    list.querySelectorAll('.admin-book-item').forEach(item => {
+      item.addEventListener('dragstart', handleDragStart);
+      item.addEventListener('dragover', handleDragOver);
+      item.addEventListener('dragleave', handleDragLeave);
+      item.addEventListener('drop', handleDrop);
+      item.addEventListener('dragend', handleDragEnd);
+    });
+  }
+}
+
+function handleDragStart(e) {
+  _dragBookId = parseInt(this.dataset.bookId);
+  this.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  this.classList.add('drag-over');
+}
+
+function handleDragLeave() {
+  this.classList.remove('drag-over');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  this.classList.remove('drag-over');
+  const targetId = parseInt(this.dataset.bookId);
+  if (_dragBookId === null || _dragBookId === targetId) return;
+
+  const fromIdx = data.books.findIndex(b => b.id === _dragBookId);
+  const toIdx = data.books.findIndex(b => b.id === targetId);
+  if (fromIdx === -1 || toIdx === -1) return;
+
+  const [moved] = data.books.splice(fromIdx, 1);
+  data.books.splice(toIdx, 0, moved);
+  saveData();
+  renderBookList();
+}
+
+function handleDragEnd() {
+  _dragBookId = null;
+  document.querySelectorAll('.admin-book-item').forEach(el => {
+    el.classList.remove('dragging', 'drag-over');
   });
 }
 
