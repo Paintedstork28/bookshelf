@@ -61,7 +61,7 @@ function getFilteredBooks() {
   const sort = document.getElementById('sort-by').value;
 
   let filtered = allBooks.filter(book => {
-    if (search && !book.title.toLowerCase().includes(search) && !book.author.toLowerCase().includes(search)) return false;
+    if (search && !book.title.toLowerCase().includes(search) && !book.author.toLowerCase().includes(search) && !(book.tags || []).some(t => t.toLowerCase().includes(search))) return false;
     if (category && book.category !== category) return false;
     if (rating && book.rating < parseInt(rating)) return false;
     if (tag && !(book.tags || []).includes(tag)) return false;
