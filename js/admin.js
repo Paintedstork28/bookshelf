@@ -1,6 +1,10 @@
 // ===== Admin Page Logic =====
 
 let data = { categories: [], tags: [], books: [] };
+let _lastDeleted = null;
+let _lastDeletedIndex = -1;
+let _undoTimer = null;
+const MAX_BACKUPS = 10;
 
 // --- Auth ---
 async function hashPassword(password) {
@@ -21,12 +25,12 @@ async function handleSetup(e) {
   e.preventDefault();
   const user = document.getElementById('setup-user').value.trim();
   const pass = document.getElementById('setup-pass').value;
-  const confirm = document.getElementById('setup-confirm').value;
+  const confirmPass = document.getElementById('setup-confirm').value;
   const error = document.getElementById('auth-error');
 
   if (!user || !pass) { error.textContent = 'All fields are required.'; return; }
   if (pass.length < 6) { error.textContent = 'Password must be at least 6 characters.'; return; }
-  if (pass !== confirm) { error.textContent = 'Passwords do not match.'; return; }
+  if (pass !== confirmPass) { error.textContent = 'Passwords do not match.'; return; }
 
   const hashed = await hashPassword(pass);
   localStorage.setItem('bookshelf_admin_user', user);
@@ -122,8 +126,6 @@ function loadData() {
   if (stored) {
     data = JSON.parse(stored);
     migrateReviews();
-  } else {
-    // Load will be async, trigger from init
   }
 }
 
@@ -164,7 +166,116 @@ function getNextId() {
   return Math.max(...data.books.map(b => b.id)) + 1;
 }
 
-function showToast(msg) {
+// --- Backup System ---
+function createBackup(label) {
+  const key = 'bookshelf_backup_' + Date.now();
+  const backup = {
+    label: label,
+    timestamp: new Date().toISOString(),
+    bookCount: data.books.length,
+    data: JSON.parse(JSON.stringify(data))
+  };
+  localStorage.setItem(key, JSON.stringify(backup));
+  pruneBackups();
+}
+
+function getBackups() {
+  const backups = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith('bookshelf_backup_')) {
+      try {
+        const val = JSON.parse(localStorage.getItem(key));
+        backups.push({ key, ...val });
+      } catch (e) { /* skip corrupt entries */ }
+    }
+  }
+  backups.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  return backups;
+}
+
+function pruneBackups() {
+  const backups = getBackups();
+  if (backups.length > MAX_BACKUPS) {
+    backups.slice(MAX_BACKUPS).forEach(b => localStorage.removeItem(b.key));
+  }
+}
+
+function restoreBackup(key) {
+  const raw = localStorage.getItem(key);
+  if (!raw) { showToast('Backup not found.'); return; }
+  try {
+    const backup = JSON.parse(raw);
+    createBackup('Pre-restore');
+    data = backup.data;
+    saveData();
+    renderAll();
+    showToast('Backup restored.');
+  } catch (e) {
+    showToast('Failed to restore backup.');
+  }
+}
+
+function downloadBackup(key) {
+  const raw = localStorage.getItem(key);
+  if (!raw) return;
+  const backup = JSON.parse(raw);
+  const dateStr = new Date(backup.timestamp).toISOString().split('T')[0];
+  const blob = new Blob([JSON.stringify(backup.data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `bookshelf-backup-${dateStr}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function deleteBackup(key) {
+  localStorage.removeItem(key);
+  renderBackups();
+  showToast('Backup deleted.');
+}
+
+function clearAllBackups() {
+  const input = prompt('Type DELETE to confirm removing all backups:');
+  if (input !== 'DELETE') return;
+  getBackups().forEach(b => localStorage.removeItem(b.key));
+  renderBackups();
+  showToast('All backups cleared.');
+}
+
+function renderBackups() {
+  const container = document.getElementById('backup-list');
+  const backups = getBackups();
+
+  if (backups.length === 0) {
+    container.innerHTML = '<p style="color:#97a3b6;font-size:13px;">No backups yet. Backups are created automatically before destructive actions.</p>';
+    return;
+  }
+
+  container.innerHTML = backups.map(b => {
+    const date = new Date(b.timestamp);
+    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return `
+      <div class="backup-item">
+        <div>
+          <div class="backup-label">${b.label} &middot; ${dateStr}, ${timeStr}</div>
+          <div class="backup-meta">${b.bookCount} book${b.bookCount !== 1 ? 's' : ''}</div>
+        </div>
+        <div class="backup-actions">
+          <button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;" onclick="restoreBackup('${b.key}')">Restore</button>
+          <button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;" onclick="downloadBackup('${b.key}')">Download</button>
+          <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="deleteBackup('${b.key}')">Delete</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// --- Toast (with optional undo) ---
+function showToast(msg, undoCallback) {
+  if (_undoTimer) clearTimeout(_undoTimer);
   let toast = document.getElementById('toast');
   if (!toast) {
     toast = document.createElement('div');
@@ -172,9 +283,26 @@ function showToast(msg) {
     toast.className = 'toast';
     document.body.appendChild(toast);
   }
-  toast.textContent = msg;
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 2500);
+
+  if (undoCallback) {
+    toast.innerHTML = `<span>${msg}</span><button class="toast-undo" id="toast-undo-btn">Undo</button>`;
+    toast.classList.add('show');
+    document.getElementById('toast-undo-btn').addEventListener('click', () => {
+      clearTimeout(_undoTimer);
+      undoCallback();
+      toast.classList.remove('show');
+    });
+    _undoTimer = setTimeout(() => {
+      toast.classList.remove('show');
+      // Finalize the delete — already removed from data, just clear undo state
+      _lastDeleted = null;
+      _lastDeletedIndex = -1;
+    }, 8000);
+  } else {
+    toast.innerHTML = `<span>${msg}</span>`;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+  }
 }
 
 // --- Render ---
@@ -182,6 +310,7 @@ function renderAll() {
   renderCategories();
   renderTags();
   renderBookList();
+  renderBackups();
 }
 
 function renderCategories() {
@@ -189,7 +318,7 @@ function renderCategories() {
   list.innerHTML = data.categories.map(cat => `
     <span class="item-chip">
       ${cat}
-      <button class="remove-btn" onclick="removeCategory('${cat}')">&times;</button>
+      <button class="remove-btn" onclick="removeCategory('${cat.replace(/'/g, "\\'")}')">&times;</button>
     </span>
   `).join('');
 }
@@ -199,7 +328,7 @@ function renderTags() {
   list.innerHTML = data.tags.map(tag => `
     <span class="item-chip">
       ${tag}
-      <button class="remove-btn" onclick="removeTag('${tag}')">&times;</button>
+      <button class="remove-btn" onclick="removeTag('${tag.replace(/'/g, "\\'")}')">&times;</button>
     </span>
   `).join('');
 }
@@ -207,7 +336,7 @@ function renderTags() {
 function renderBookList() {
   const list = document.getElementById('admin-book-list');
   if (data.books.length === 0) {
-    list.innerHTML = '<p style="color:#999;font-size:0.9rem">No books yet. Add one below.</p>';
+    list.innerHTML = '<p style="color:#97a3b6;font-size:13px">No books yet. Add one below.</p>';
     return;
   }
   list.innerHTML = data.books.map(book => `
@@ -251,7 +380,7 @@ function renderBookForm(book = null) {
             <input type="url" id="bf-cover" value="${isEdit ? (book.cover || '') : ''}" placeholder="Auto-fetched from Open Library..." style="flex:1">
             <button type="button" class="btn btn-secondary" id="fetch-cover-btn" onclick="fetchCover()">Fetch Cover</button>
           </div>
-          <small id="cover-status" style="color:#999;font-size:0.75rem">Fill in title & author, then click Fetch Cover — or it auto-fetches when you tab out of Author.</small>
+          <small id="cover-status" style="color:#97a3b6;font-size:0.75rem">Fill in title & author, then click Fetch Cover — or it auto-fetches when you tab out of Author.</small>
         </div>
         <div>
           <label>Category *</label>
@@ -282,7 +411,7 @@ function renderBookForm(book = null) {
       </div>
       <div>
         <label>Review</label>
-        <textarea id="bf-review">${isEdit ? (book.review || book.reviewSpoilerFree || '') : ''}</textarea>
+        <textarea id="bf-review">${isEdit ? (book.review || '') : ''}</textarea>
       </div>
       <input type="hidden" id="bf-id" value="${isEdit ? book.id : ''}">
       <div class="form-actions">
@@ -293,7 +422,6 @@ function renderBookForm(book = null) {
   `;
 
   document.getElementById('book-form').addEventListener('submit', handleBookSubmit);
-  // Auto-fetch cover when author field loses focus (if title is also filled)
   document.getElementById('bf-author').addEventListener('blur', () => {
     const title = document.getElementById('bf-title').value.trim();
     const author = document.getElementById('bf-author').value.trim();
@@ -311,12 +439,12 @@ async function fetchCover() {
   const status = document.getElementById('cover-status');
   const btn = document.getElementById('fetch-cover-btn');
 
-  if (!title) { status.textContent = 'Enter a title first.'; status.style.color = '#c0392b'; return; }
+  if (!title) { status.textContent = 'Enter a title first.'; status.style.color = '#e74c3c'; return; }
 
   btn.disabled = true;
   btn.textContent = 'Searching...';
   status.textContent = 'Searching Open Library...';
-  status.style.color = '#999';
+  status.style.color = '#97a3b6';
 
   try {
     const query = encodeURIComponent(`${title} ${author}`);
@@ -324,28 +452,27 @@ async function fetchCover() {
     const json = await res.json();
 
     if (json.docs && json.docs.length > 0) {
-      // Try cover_i first (direct cover ID), then ISBN
       const doc = json.docs[0];
       if (doc.cover_i) {
         coverInput.value = `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`;
         status.textContent = 'Cover found!';
-        status.style.color = '#27ae60';
+        status.style.color = '#0fba68';
       } else if (doc.isbn && doc.isbn.length > 0) {
         coverInput.value = `https://covers.openlibrary.org/b/isbn/${doc.isbn[0]}-L.jpg`;
         status.textContent = 'Cover found via ISBN.';
-        status.style.color = '#27ae60';
+        status.style.color = '#0fba68';
       } else {
         status.textContent = 'No cover found. You can paste a URL manually.';
-        status.style.color = '#c0392b';
+        status.style.color = '#e74c3c';
       }
     } else {
       status.textContent = 'No results found. Try a different title/author or paste a URL manually.';
-      status.style.color = '#c0392b';
+      status.style.color = '#e74c3c';
     }
   } catch (e) {
     console.error('Cover fetch error:', e);
     status.textContent = 'Failed to fetch. Check your internet connection.';
-    status.style.color = '#c0392b';
+    status.style.color = '#e74c3c';
   }
 
   btn.disabled = false;
@@ -386,7 +513,8 @@ function addTag() {
 }
 
 function removeTag(tag) {
-  if (!confirm(`Remove tag "${tag}"?`)) return;
+  if (!confirm(`Remove tag "${tag}"? It will be removed from all books.`)) return;
+  createBackup('Before removing tag: ' + tag);
   data.tags = data.tags.filter(t => t !== tag);
   data.books.forEach(b => { b.tags = (b.tags || []).filter(t => t !== tag); });
   saveData();
@@ -407,11 +535,30 @@ function editBook(id) {
 function deleteBook(id) {
   const book = data.books.find(b => b.id === id);
   if (!book) return;
-  if (!confirm(`Delete "${book.title}"? This cannot be undone.`)) return;
-  data.books = data.books.filter(b => b.id !== id);
+
+  // Create backup before delete
+  createBackup('Before deleting: ' + book.title);
+
+  // Soft-delete: remove from array but keep reference for undo
+  const idx = data.books.findIndex(b => b.id === id);
+  _lastDeleted = JSON.parse(JSON.stringify(book));
+  _lastDeletedIndex = idx;
+  data.books.splice(idx, 1);
   saveData();
   renderBookList();
-  showToast(`"${book.title}" deleted.`);
+
+  // Show toast with undo
+  showToast(`"${book.title}" deleted.`, () => {
+    // Undo: re-insert at original position
+    if (_lastDeleted) {
+      data.books.splice(_lastDeletedIndex, 0, _lastDeleted);
+      saveData();
+      renderBookList();
+      _lastDeleted = null;
+      _lastDeletedIndex = -1;
+      showToast('Delete undone.');
+    }
+  });
 }
 
 function cancelForm() {
@@ -451,17 +598,24 @@ function handleBookSubmit(e) {
 
 // --- Export / Import ---
 function exportData() {
+  const dateStr = new Date().toISOString().split('T')[0];
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'books.json';
+  a.download = `bookshelf-backup-${dateStr}.json`;
   a.click();
   URL.revokeObjectURL(url);
   showToast('Data exported.');
 }
 
 function importData() {
+  const mode = prompt('Import mode:\n\nType "replace" to replace all data\nType "merge" to add new books only');
+  if (!mode || (mode !== 'replace' && mode !== 'merge')) {
+    showToast('Import cancelled.');
+    return;
+  }
+
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.json';
@@ -471,29 +625,57 @@ function importData() {
     try {
       const text = await file.text();
       const imported = JSON.parse(text);
-      if (!imported.books || !imported.categories) {
-        showToast('Invalid data file.');
+
+      // Validate structure
+      if (!imported.books || !Array.isArray(imported.books) || !imported.categories || !Array.isArray(imported.categories)) {
+        showToast('Invalid file: must have books and categories arrays.');
         return;
       }
+
+      // Validate each book has required fields
+      const invalid = imported.books.filter(b => !b.title || !b.author || !b.id);
+      if (invalid.length > 0) {
+        showToast(`Invalid file: ${invalid.length} book(s) missing title, author, or id.`);
+        return;
+      }
+
       if (!imported.tags) imported.tags = [];
-      data = imported;
+
+      // Auto-backup before import
+      createBackup('Pre-import');
+
+      if (mode === 'replace') {
+        data = imported;
+      } else {
+        // Merge: add books with new IDs, merge categories and tags
+        const existingIds = new Set(data.books.map(b => b.id));
+        let nextId = getNextId();
+        imported.books.forEach(book => {
+          if (!existingIds.has(book.id)) {
+            data.books.push(book);
+          } else {
+            // ID conflict — assign new ID
+            book.id = nextId++;
+            data.books.push(book);
+          }
+        });
+        // Merge categories and tags (no duplicates)
+        imported.categories.forEach(c => {
+          if (!data.categories.includes(c)) data.categories.push(c);
+        });
+        imported.tags.forEach(t => {
+          if (!data.tags.includes(t)) data.tags.push(t);
+        });
+      }
+
       saveData();
       renderAll();
-      showToast('Data imported successfully.');
+      showToast(`Data imported (${mode}). ${data.books.length} books total.`);
     } catch (err) {
-      showToast('Failed to import file.');
+      showToast('Failed to import file. Check the JSON format.');
     }
   };
   input.click();
-}
-
-function resetToFile() {
-  if (!confirm('Reset all data to the original books.json? All admin changes will be lost.')) return;
-  localStorage.removeItem('bookshelf_data');
-  loadDataFromFile().then(() => {
-    renderAll();
-    showToast('Data reset to original.');
-  });
 }
 
 // --- Init ---
