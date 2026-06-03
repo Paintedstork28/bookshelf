@@ -122,39 +122,16 @@ function showAdmin() {
 
 // --- Data ---
 function loadData() {
-  const stored = localStorage.getItem('bookshelf_data');
-  if (stored) {
-    data = JSON.parse(stored);
-    migrateReviews();
+  const loaded = loadBookshelfData();
+  if (loaded) {
+    data = loaded;
   }
-}
-
-function migrateReviews() {
-  let changed = false;
-  data.books.forEach(book => {
-    if (book.reviewSpoilerFree || book.reviewSpoiler) {
-      if (!book.review) {
-        const parts = [book.reviewSpoilerFree, book.reviewSpoiler].filter(Boolean);
-        book.review = parts.join('\n\n');
-      }
-      delete book.reviewSpoilerFree;
-      delete book.reviewSpoiler;
-      changed = true;
-    }
-  });
-  if (changed) saveData();
 }
 
 async function loadDataFromFile() {
-  try {
-    const res = await fetch('data/books.json');
-    data = await res.json();
-    if (!data.tags) data.tags = [];
-    saveData();
-  } catch (e) {
-    console.error('Failed to load books.json:', e);
-    data = { categories: [], tags: [], books: [] };
-  }
+  data = await fetchBookshelfData();
+  if (!data.tags) data.tags = [];
+  saveData();
 }
 
 function saveData() {
@@ -260,17 +237,26 @@ function renderBackups() {
     return `
       <div class="backup-item">
         <div>
-          <div class="backup-label">${b.label} &middot; ${dateStr}, ${timeStr}</div>
+          <div class="backup-label">${escapeHtml(b.label)} &middot; ${dateStr}, ${timeStr}</div>
           <div class="backup-meta">${b.bookCount} book${b.bookCount !== 1 ? 's' : ''}</div>
         </div>
         <div class="backup-actions">
-          <button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;" onclick="restoreBackup('${b.key}')">Restore</button>
-          <button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;" onclick="downloadBackup('${b.key}')">Download</button>
-          <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" onclick="deleteBackup('${b.key}')">Delete</button>
+          <button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;" data-action="restore" data-key="${escapeHtml(b.key)}">Restore</button>
+          <button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;" data-action="download" data-key="${escapeHtml(b.key)}">Download</button>
+          <button class="btn btn-danger" style="padding:5px 10px;font-size:12px;" data-action="delete-backup" data-key="${escapeHtml(b.key)}">Delete</button>
         </div>
       </div>
     `;
   }).join('');
+  container.querySelectorAll('[data-action="restore"]').forEach(btn => {
+    btn.addEventListener('click', () => restoreBackup(btn.dataset.key));
+  });
+  container.querySelectorAll('[data-action="download"]').forEach(btn => {
+    btn.addEventListener('click', () => downloadBackup(btn.dataset.key));
+  });
+  container.querySelectorAll('[data-action="delete-backup"]').forEach(btn => {
+    btn.addEventListener('click', () => deleteBackup(btn.dataset.key));
+  });
 }
 
 // --- Toast (with optional undo) ---
@@ -315,22 +301,28 @@ function renderAll() {
 
 function renderCategories() {
   const list = document.getElementById('category-list');
-  list.innerHTML = data.categories.map(cat => `
+  list.innerHTML = data.categories.map((cat, i) => `
     <span class="item-chip">
-      ${cat}
-      <button class="remove-btn" onclick="removeCategory('${cat.replace(/'/g, "\\'")}')">&times;</button>
+      ${escapeHtml(cat)}
+      <button class="remove-btn" data-action="remove-category" data-index="${i}">&times;</button>
     </span>
   `).join('');
+  list.querySelectorAll('[data-action="remove-category"]').forEach(btn => {
+    btn.addEventListener('click', () => removeCategory(data.categories[btn.dataset.index]));
+  });
 }
 
 function renderTags() {
   const list = document.getElementById('tag-list');
-  list.innerHTML = data.tags.map(tag => `
+  list.innerHTML = data.tags.map((tag, i) => `
     <span class="item-chip">
-      ${tag}
-      <button class="remove-btn" onclick="removeTag('${tag.replace(/'/g, "\\'")}')">&times;</button>
+      ${escapeHtml(tag)}
+      <button class="remove-btn" data-action="remove-tag" data-index="${i}">&times;</button>
     </span>
   `).join('');
+  list.querySelectorAll('[data-action="remove-tag"]').forEach(btn => {
+    btn.addEventListener('click', () => removeTag(data.tags[btn.dataset.index]));
+  });
 }
 
 function renderBookList() {
@@ -342,18 +334,24 @@ function renderBookList() {
   list.innerHTML = data.books.map(book => `
     <div class="admin-book-item">
       <div class="book-info">
-        ${book.cover ? `<img src="${book.cover}" alt="" onerror="this.style.display='none'">` : ''}
+        ${book.cover ? `<img src="${escapeHtml(book.cover)}" alt="" onerror="this.style.display='none'">` : ''}
         <div>
-          <div class="book-title">${book.title}</div>
-          <div class="book-author">${book.author} &middot; ${book.category} &middot; ${'&#9733;'.repeat(book.rating)}</div>
+          <div class="book-title">${escapeHtml(book.title)}</div>
+          <div class="book-author">${escapeHtml(book.author)} &middot; ${escapeHtml(book.category)} &middot; ${'&#9733;'.repeat(book.rating)}</div>
         </div>
       </div>
       <div class="book-actions">
-        <button class="btn btn-secondary" onclick="editBook(${book.id})">Edit</button>
-        <button class="btn btn-danger" onclick="deleteBook(${book.id})">Delete</button>
+        <button class="btn btn-secondary" data-action="edit" data-id="${book.id}">Edit</button>
+        <button class="btn btn-danger" data-action="delete" data-id="${book.id}">Delete</button>
       </div>
     </div>
   `).join('');
+  list.querySelectorAll('[data-action="edit"]').forEach(btn => {
+    btn.addEventListener('click', () => editBook(parseInt(btn.dataset.id)));
+  });
+  list.querySelectorAll('[data-action="delete"]').forEach(btn => {
+    btn.addEventListener('click', () => deleteBook(parseInt(btn.dataset.id)));
+  });
 }
 
 function renderBookForm(book = null) {
@@ -366,19 +364,19 @@ function renderBookForm(book = null) {
       <div class="form-row">
         <div>
           <label>Title *</label>
-          <input type="text" id="bf-title" value="${isEdit ? book.title : ''}" required>
+          <input type="text" id="bf-title" value="${isEdit ? escapeHtml(book.title) : ''}" required>
         </div>
         <div>
           <label>Author *</label>
-          <input type="text" id="bf-author" value="${isEdit ? book.author : ''}" required>
+          <input type="text" id="bf-author" value="${isEdit ? escapeHtml(book.author) : ''}" required>
         </div>
       </div>
       <div class="form-row">
         <div>
           <label>Cover Image URL</label>
           <div style="display:flex;gap:0.5rem;align-items:center">
-            <input type="url" id="bf-cover" value="${isEdit ? (book.cover || '') : ''}" placeholder="Auto-fetched from Open Library..." style="flex:1">
-            <button type="button" class="btn btn-secondary" id="fetch-cover-btn" onclick="fetchCover()">Fetch Cover</button>
+            <input type="url" id="bf-cover" value="${isEdit ? escapeHtml(book.cover || '') : ''}" placeholder="Auto-fetched from Open Library..." style="flex:1">
+            <button type="button" class="btn btn-secondary" id="fetch-cover-btn">Fetch Cover</button>
           </div>
           <small id="cover-status" style="color:#97a3b6;font-size:0.75rem">Fill in title & author, then click Fetch Cover — or it auto-fetches when you tab out of Author.</small>
         </div>
@@ -386,7 +384,7 @@ function renderBookForm(book = null) {
           <label>Category *</label>
           <select id="bf-category" required>
             <option value="">Select...</option>
-            ${data.categories.map(c => `<option value="${c}" ${isEdit && book.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+            ${data.categories.map(c => `<option value="${escapeHtml(c)}" ${isEdit && book.category === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -402,8 +400,8 @@ function renderBookForm(book = null) {
           <div class="tag-checkboxes">
             ${data.tags.map(t => `
               <label>
-                <input type="checkbox" value="${t}" ${isEdit && (book.tags || []).includes(t) ? 'checked' : ''}>
-                ${t}
+                <input type="checkbox" value="${escapeHtml(t)}" ${isEdit && (book.tags || []).includes(t) ? 'checked' : ''}>
+                ${escapeHtml(t)}
               </label>
             `).join('')}
           </div>
@@ -411,7 +409,7 @@ function renderBookForm(book = null) {
       </div>
       <div>
         <label>Review</label>
-        <textarea id="bf-review">${isEdit ? (book.review || '') : ''}</textarea>
+        <textarea id="bf-review">${isEdit ? escapeHtml(book.review || '') : ''}</textarea>
       </div>
       <input type="hidden" id="bf-id" value="${isEdit ? book.id : ''}">
       <div class="form-actions">
@@ -422,6 +420,7 @@ function renderBookForm(book = null) {
   `;
 
   document.getElementById('book-form').addEventListener('submit', handleBookSubmit);
+  document.getElementById('fetch-cover-btn').addEventListener('click', fetchCover);
   document.getElementById('bf-author').addEventListener('blur', () => {
     const title = document.getElementById('bf-title').value.trim();
     const author = document.getElementById('bf-author').value.trim();
