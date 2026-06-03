@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Bookshelf</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <h1><a href="index.html">Bookshelf</a></h1>
+      <nav>
+        <a href="index.html">My Books</a>
+        <a href="admin.html" class="active">Admin</a>
+        <a href="#" id="logout-btn" style="display:none" onclick="logout(); return false;">Logout</a>
+      </nav>
+    </div>
+  </header>
+
+  <div id="auth-container"></div>
+
+  <div id="admin-content" style="display:none">
+    <div class="admin-container">
+      <h2>Admin Panel</h2>
+
+      <div class="data-bar">
+        <button class="btn btn-secondary" onclick="exportData()">Export JSON</button>
+        <button class="btn btn-secondary" onclick="importData()">Import JSON</button>
+        <button class="btn btn-secondary" onclick="resetToFile()">Reset to Original</button>
+      </div>
+
+      <div class="admin-section">
+        <h3>Categories</h3>
+        <div class="item-list" id="category-list"></div>
+        <div class="add-row">
+          <input type="text" id="new-category" placeholder="New category name...">
+          <button class="btn btn-primary" onclick="addCategory()">Add</button>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h3>Tags</h3>
+        <div class="item-list" id="tag-list"></div>
+        <div class="add-row">
+          <input type="text" id="new-tag" placeholder="New tag name...">
+          <button class="btn btn-primary" onclick="addTag()">Add</button>
+        </div>
+      </div>
+
+      <div class="admin-section">
+        <h3>Books</h3>
+        <div class="admin-book-list" id="admin-book-list"></div>
+        <div style="margin-top:14px">
+          <button class="btn btn-success" onclick="showAddBookForm()">+ Add New Book</button>
+        </div>
+      </div>
+
+      <div id="book-form-container"></div>
+    </div>
+  </div>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>

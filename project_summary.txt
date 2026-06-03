@@ -1,0 +1,51 @@
+PROJECT SUMMARY — Bookshelf
+============================
+
+1. PROJECT CONCEPT
+   A personal book review website. Public visitors browse a bookshelf grid, filter/sort books,
+   and read spoiler-free or spoiler reviews. An admin panel (login-protected) lets the owner
+   manage categories, tags, and books — add, edit, or remove.
+
+2. HOW IT WAS BUILT
+   - Tech: Static HTML/CSS/JS — no frameworks, no backend
+   - Data: JSON file (data/books.json) + localStorage for persistence
+   - Auth: Client-side hashed credentials (SHA-256) stored in localStorage
+   - Pages: index.html (grid), book.html (detail), admin.html (admin panel)
+
+3. DATABASE STRUCTURE
+   Single JSON object with three arrays:
+   - categories: string[] — e.g., ["Fiction", "Sci-Fi"]
+   - tags: string[] — e.g., ["Must Read", "Favourite"]
+   - books: object[] — each has: id, title, author, cover (URL), rating (1-5),
+     category, tags[], dateAdded, reviewSpoilerFree, reviewSpoiler
+
+4. DATA SOURCES
+   - All data is manually entered by the admin
+   - Book cover images: user-provided URLs (e.g., Open Library covers)
+
+5. APIs & COSTS
+   - None. Fully static, no external APIs.
+
+6. DATA REFRESH
+   - Manual. Admin adds/edits/removes via the admin panel.
+   - Changes persist in localStorage.
+   - Export JSON button lets admin download updated data for GitHub commit.
+
+7. DEPLOYMENT
+   - Platform: GitHub Pages
+   - Repo: TBD (to be created)
+   - URL: TBD
+
+8. WHAT IT CAN BE USED FOR
+   - Personal book review blog
+   - Reading list showcase
+   - Book club shared shelf
+   - Target audience: Anyone who wants a simple, self-managed book review site
+
+9. SUGGESTED NEXT STEPS
+   - Add GitHub repo and deploy to GitHub Pages
+   - Add dark mode toggle
+   - Add "Currently Reading" / "Want to Read" status field
+   - Add book quotes section
+   - Add reading stats page (books per month, genre breakdown)
+   - Optional: Add search by review content

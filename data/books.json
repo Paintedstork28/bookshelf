@@ -1,0 +1,42 @@
+{
+  "categories": ["Fiction", "Non-Fiction", "Sci-Fi", "Fantasy", "Self-Help", "Biography"],
+  "tags": ["Must Read", "Favourite", "DNF", "Re-read"],
+  "books": [
+    {
+      "id": 1,
+      "title": "Project Hail Mary",
+      "author": "Andy Weir",
+      "cover": "https://covers.openlibrary.org/b/isbn/9780593135204-L.jpg",
+      "rating": 5,
+      "category": "Sci-Fi",
+      "tags": ["Must Read", "Favourite"],
+      "dateAdded": "2026-01-15",
+      "reviewSpoilerFree": "A lone astronaut wakes up on a spaceship with no memory of how he got there. What follows is one of the most gripping, funny, and heartwarming sci-fi novels in recent years. Andy Weir delivers the perfect blend of hard science and human emotion. If you liked The Martian, this is even better.",
+      "reviewSpoiler": "The friendship between Ryland Grace and Rocky is the heart of the book. Rocky's species communicates through musical tones, and the way they build trust and solve problems together is beautifully written. The reveal that Grace volunteered (was forced) for the mission adds moral complexity. The ending — Grace choosing to stay with Rocky's people rather than return to Earth — is the perfect conclusion."
+    },
+    {
+      "id": 2,
+      "title": "Atomic Habits",
+      "author": "James Clear",
+      "cover": "https://covers.openlibrary.org/b/isbn/9780735211292-L.jpg",
+      "rating": 4,
+      "category": "Self-Help",
+      "tags": ["Must Read"],
+      "dateAdded": "2026-02-20",
+      "reviewSpoilerFree": "A practical, no-nonsense guide to building good habits and breaking bad ones. James Clear breaks down the science of habit formation into four simple laws. The examples are relatable and the frameworks are immediately actionable. A must-read for anyone looking to make small changes that compound over time.",
+      "reviewSpoiler": ""
+    },
+    {
+      "id": 3,
+      "title": "The Name of the Wind",
+      "author": "Patrick Rothfuss",
+      "cover": "https://covers.openlibrary.org/b/isbn/9780756404741-L.jpg",
+      "rating": 5,
+      "category": "Fantasy",
+      "tags": ["Favourite"],
+      "dateAdded": "2026-03-10",
+      "reviewSpoilerFree": "Kvothe tells the story of his life to a chronicler — from his childhood in a troupe of travelling performers to his years at the University. The prose is lyrical, the magic system is fascinating, and the world-building is rich. One of the best fantasy novels ever written.",
+      "reviewSpoiler": "The Chandrian attack on Kvothe's troupe is haunting and sets up the central mystery perfectly. His time at the University — especially his rivalry with Ambrose and his relationship with Denna — gives the story depth beyond the typical fantasy quest. The unreliable narrator aspect (Kvothe is telling his own legend) adds layers. The tragedy is that book three may never come."
+    }
+  ]
+}
